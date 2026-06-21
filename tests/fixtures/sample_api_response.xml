@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE.</resultMsg></header>
+  <body>
+    <items>
+      <item>
+        <거래금액>   285,000</거래금액>
+        <건축년도>2002</건축년도>
+        <년>2026</년>
+        <법정동>대치동</법정동>
+        <아파트>래미안대치팰리스</아파트>
+        <전용면적>84.99</전용면적>
+        <지번>316</지번>
+        <층>12</층>
+        <월>5</월>
+        <일>15</일>
+      </item>
+      <item>
+        <거래금액>   195,000</거래금액>
+        <건축년도>1979</건축년도>
+        <년>2026</년>
+        <법정동>대치동</법정동>
+        <아파트>은마아파트</아파트>
+        <전용면적>76.79</전용면적>
+        <지번>350</지번>
+        <층>8</층>
+        <월>5</월>
+        <일>20</일>
+      </item>
+    </items>
+    <numOfRows>1000</numOfRows>
+    <pageNo>1</pageNo>
+    <totalCount>2</totalCount>
+  </body>
+</response>
