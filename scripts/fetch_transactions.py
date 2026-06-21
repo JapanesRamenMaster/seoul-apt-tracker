@@ -30,6 +30,11 @@ def area_bucket(sqm: float) -> str:
     return AREA_LABELS[-1]
 
 
+_REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+}
+
+
 def fetch_district_month(district_code: str, yyyymm: str, api_key: str) -> pd.DataFrame:
     params = {
         "serviceKey": api_key,
@@ -38,12 +43,13 @@ def fetch_district_month(district_code: str, yyyymm: str, api_key: str) -> pd.Da
         "numOfRows": 1000,
         "pageNo": 1,
     }
-    resp = requests.get(API_BASE, params=params, timeout=30)
+    resp = requests.get(API_BASE, params=params, headers=_REQUEST_HEADERS, timeout=30)
     resp.raise_for_status()
     return _parse_xml(resp.text, district_code, yyyymm)
 
 
 def _parse_xml(xml_text: str, district_code: str, yyyymm: str) -> pd.DataFrame:
+    """API v2 응답 파싱 (영문 필드명: aptNm, dealAmount, excluUseAr, umdNm, floor)"""
     root = ET.fromstring(xml_text)
     rows = []
     district = _CODE_TO_DISTRICT.get(district_code, "")
@@ -51,20 +57,20 @@ def _parse_xml(xml_text: str, district_code: str, yyyymm: str) -> pd.DataFrame:
         def t(tag: str) -> str:
             el = item.find(tag)
             return el.text.strip() if el is not None and el.text else ""
-        price_raw = t("거래금액").replace(",", "").strip()
-        sqm_raw = t("전용면적").strip()
+        price_raw = t("dealAmount").replace(",", "").strip()
+        sqm_raw = t("excluUseAr").strip()
         if not price_raw or not sqm_raw:
             continue
         sqm = float(sqm_raw)
         rows.append({
             "거래년월": yyyymm,
             "구": district,
-            "법정동": t("법정동"),
-            "단지명": t("아파트"),
+            "법정동": t("umdNm"),
+            "단지명": t("aptNm"),
             "전용면적": sqm,
             "면적구간": area_bucket(sqm),
             "거래금액": int(price_raw),
-            "층": t("층"),
+            "층": t("floor"),
         })
     return pd.DataFrame(rows, columns=["거래년월", "구", "법정동", "단지명", "전용면적", "면적구간", "거래금액", "층"])
 
