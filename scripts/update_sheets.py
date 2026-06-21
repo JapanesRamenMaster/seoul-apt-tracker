@@ -8,18 +8,24 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-SA_KEY_PATH = os.environ.get(
-    "GOOGLE_SERVICE_ACCOUNT_JSON",
-    "/Users/trive/.claude/google-sheets-key.json",
-)
+_DEFAULT_KEY_PATH = "/Users/trive/.claude/google-sheets-key.json"
 IMPERSONATE_SUBJECT = "juseong.maeng@thetrive.com"
 
 
 def get_client() -> gspread.Client:
-    creds = service_account.Credentials.from_service_account_file(
-        SA_KEY_PATH, scopes=SCOPES
-    ).with_subject(IMPERSONATE_SUBJECT)
-    return gspread.Client(auth=creds)
+    import json as _json
+    sa_val = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", _DEFAULT_KEY_PATH)
+    # JSON 문자열이면 직접 파싱, 파일 경로면 파일 읽기
+    if sa_val.strip().startswith("{"):
+        info = _json.loads(sa_val)
+        creds = service_account.Credentials.from_service_account_info(
+            info, scopes=SCOPES
+        )
+    else:
+        creds = service_account.Credentials.from_service_account_file(
+            sa_val, scopes=SCOPES
+        )
+    return gspread.Client(auth=creds.with_subject(IMPERSONATE_SUBJECT))
 
 
 RAW_COLUMNS = ["거래년월", "구", "법정동", "단지명", "전용면적", "면적구간", "거래금액", "층"]
