@@ -1,0 +1,52 @@
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+
+def compute_monthly_avg(raw: pd.DataFrame) -> pd.DataFrame:
+    """raw 거래 데이터 → 단지·면적구간·월별 평균가"""
+    grouped = (
+        raw.groupby(["거래년월", "구", "단지명", "면적구간"])["거래금액"]
+        .agg(평균거래금액="mean", 거래건수="count")
+        .reset_index()
+    )
+    grouped["평균거래금액"] = grouped["평균거래금액"].round(0).astype(int)
+    return grouped.sort_values(["단지명", "면적구간", "거래년월"])
+
+
+def compute_projection(monthly_avg: pd.DataFrame, min_trades: int = 5) -> pd.DataFrame:
+    """monthly_avg → 단지별 선형회귀 기반 다음달 프로젝션"""
+    results = []
+    groups = monthly_avg.groupby(["구", "단지명", "면적구간"])
+
+    for (district, apt, area), group in groups:
+        total_trades = group["거래건수"].sum()
+        if total_trades < min_trades:
+            continue
+
+        group = group.sort_values("거래년월")
+        months = group["거래년월"].tolist()
+        prices = group["평균거래금액"].tolist()
+
+        x = np.arange(len(prices))
+        slope, intercept, _, _, _ = stats.linregress(x, prices)
+
+        latest_price = prices[-1]
+        next_price = round(latest_price + slope)
+        first_price = prices[0]
+        n_years = len(months) / 12
+        cagr = ((latest_price / first_price) ** (1 / n_years) - 1) * 100 if n_years > 0 and first_price > 0 else 0
+
+        results.append({
+            "구": district,
+            "단지명": apt,
+            "면적구간": area,
+            "데이터기간": f"{months[0]}~{months[-1]}",
+            "최근실거래가": latest_price,
+            "월평균변동": round(slope),
+            "다음달예상가": next_price,
+            "5년CAGR": round(cagr, 2),
+            "총거래건수": total_trades,
+        })
+
+    return pd.DataFrame(results)
