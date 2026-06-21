@@ -31,6 +31,9 @@ def compute_projection(monthly_avg: pd.DataFrame, min_trades: int = 5) -> pd.Dat
         x = np.arange(len(prices))
         slope, intercept, _, _, _ = stats.linregress(x, prices)
 
+        if np.isnan(slope):
+            continue  # 데이터 1개월뿐이면 회귀 불가
+
         latest_price = prices[-1]
         next_price = round(latest_price + slope)
         first_price = prices[0]

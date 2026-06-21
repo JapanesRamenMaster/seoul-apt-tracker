@@ -45,6 +45,8 @@ def main(yyyymm: str = None) -> None:
     append_raw(gc, spreadsheet_id, raw)
 
     full_raw = _load_full_raw(gc, spreadsheet_id)
+    if full_raw.empty:
+        full_raw = raw  # 첫 실행 fallback: 방금 수집한 데이터만 사용
     monthly_avg = compute_monthly_avg(full_raw)
     projection = compute_projection(monthly_avg)
 
@@ -55,15 +57,22 @@ def main(yyyymm: str = None) -> None:
 
 def _load_full_raw(gc, spreadsheet_id: str):
     import pandas as pd
+    from scripts.update_sheets import RAW_COLUMNS
     sh = gc.open_by_key(spreadsheet_id)
     ws = sh.worksheet("raw")
     data = ws.get_all_values()
     if len(data) < 2:
         return pd.DataFrame()
-    headers, rows = data[0], data[1:]
-    df = pd.DataFrame(rows, columns=headers)
-    df["거래금액"] = df["거래금액"].astype(int)
-    df["전용면적"] = df["전용면적"].astype(float)
+    # 첫 행이 헤더인지 데이터인지 판별
+    if data[0][0] == "거래년월":
+        rows = data[1:]
+    else:
+        rows = data
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows, columns=RAW_COLUMNS)
+    df["거래금액"] = pd.to_numeric(df["거래금액"], errors="coerce").fillna(0).astype(int)
+    df["전용면적"] = pd.to_numeric(df["전용면적"], errors="coerce")
     return df
 
 

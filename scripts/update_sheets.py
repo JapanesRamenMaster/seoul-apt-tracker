@@ -1,28 +1,34 @@
-import json
 import os
 import gspread
 import pandas as pd
-from google.oauth2.service_account import Credentials
+from google.oauth2 import service_account
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
 
+SA_KEY_PATH = os.environ.get(
+    "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "/Users/trive/.claude/google-sheets-key.json",
+)
+IMPERSONATE_SUBJECT = "juseong.maeng@thetrive.com"
+
 
 def get_client() -> gspread.Client:
-    sa_json = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    if sa_json.strip().startswith("{"):
-        info = json.loads(sa_json)
-    else:
-        with open(sa_json) as f:
-            info = json.load(f)
-    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-    return gspread.authorize(creds)
+    creds = service_account.Credentials.from_service_account_file(
+        SA_KEY_PATH, scopes=SCOPES
+    ).with_subject(IMPERSONATE_SUBJECT)
+    return gspread.Client(auth=creds)
+
+
+RAW_COLUMNS = ["거래년월", "구", "법정동", "단지명", "전용면적", "면적구간", "거래금액", "층"]
 
 
 def append_raw(gc: gspread.Client, spreadsheet_id: str, df: pd.DataFrame) -> None:
-    """raw 탭에 신규 행 append. 같은 거래년월이 이미 있으면 먼저 삭제 후 추가."""
+    """raw 탭에 신규 행 append. 같은 거래년월이 있으면 먼저 삭제 후 추가.
+    항상 헤더를 첫 행으로 유지한다.
+    """
     sh = gc.open_by_key(spreadsheet_id)
     ws = _get_or_create(sh, "raw")
 
@@ -32,19 +38,19 @@ def append_raw(gc: gspread.Client, spreadsheet_id: str, df: pd.DataFrame) -> Non
     yyyymm = df["거래년월"].iloc[0]
     existing = ws.get_all_values()
 
-    if len(existing) > 1:
-        headers = existing[0]
-        if "거래년월" in headers:
-            col_idx = headers.index("거래년월")
-            rows_to_keep = [existing[0]] + [
-                row for row in existing[1:] if row[col_idx] != yyyymm
-            ]
-            ws.clear()
-            ws.update(rows_to_keep)
+    # 기존 데이터에서 같은 연월 제거 (헤더 제외)
+    if existing:
+        # 헤더 여부 판단: 첫 행에 숫자만 있으면 헤더 없는 것
+        has_header = existing[0][0] == "거래년월"
+        data_rows = existing[1:] if has_header else existing
+        kept = [row for row in data_rows if row[0] != yyyymm]
+    else:
+        kept = []
 
-    if not ws.get_all_values():
-        ws.append_row(df.columns.tolist())
-    ws.append_rows(df.values.tolist())
+    # 헤더 + 기존 데이터 + 신규 데이터 전체 덮어쓰기
+    all_rows = [RAW_COLUMNS] + kept + df.values.tolist()
+    ws.clear()
+    ws.update(all_rows)
 
 
 def overwrite_sheet(gc: gspread.Client, spreadsheet_id: str, tab_name: str, df: pd.DataFrame) -> None:
