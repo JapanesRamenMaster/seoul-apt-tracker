@@ -30,10 +30,17 @@ def compute_projection(monthly_avg: pd.DataFrame, min_trades: int = 5, window_mo
 
         group = group.sort_values("거래년월")
 
-        # window 필터 (최근 N개월)
+        # window 필터 (최근 N캘린더월)
         if window_months > 0:
             all_months = sorted(group["거래년월"].tolist())
-            cutoff = all_months[-window_months] if len(all_months) > window_months else all_months[0]
+            latest = all_months[-1]  # "YYYYMM"
+            y, m = int(latest[:4]), int(latest[4:])
+            total = y * 12 + m - window_months
+            cy, cm = total // 12, total % 12
+            if cm == 0:
+                cy -= 1
+                cm = 12
+            cutoff = f"{cy:04d}{cm:02d}"
             windowed = group[group["거래년월"] >= cutoff]
             if windowed["거래건수"].sum() >= min_trades:
                 group = windowed
@@ -42,7 +49,11 @@ def compute_projection(monthly_avg: pd.DataFrame, min_trades: int = 5, window_mo
         months = group["거래년월"].tolist()
         prices = group["평균거래금액"].tolist()
 
-        x = np.arange(len(prices))
+        # 캘린더 기반 x축: YYYYMM → 절대 월수, 시작점 0 정규화
+        # 데이터 공백이 있어도 실제 경과 시간을 반영
+        x_abs = [int(m[:4]) * 12 + int(m[4:]) for m in months]
+        x0 = x_abs[0]
+        x = [xi - x0 for xi in x_abs]
         slope, intercept, _, _, _ = stats.linregress(x, prices)
 
         if np.isnan(slope):
