@@ -14,8 +14,12 @@ def compute_monthly_avg(raw: pd.DataFrame) -> pd.DataFrame:
     return grouped.sort_values(["단지명", "면적구간", "거래년월"])
 
 
-def compute_projection(monthly_avg: pd.DataFrame, min_trades: int = 5) -> pd.DataFrame:
-    """monthly_avg → 단지별 선형회귀 기반 다음달 프로젝션"""
+def compute_projection(monthly_avg: pd.DataFrame, min_trades: int = 5, window_months: int = 0) -> pd.DataFrame:
+    """monthly_avg → 단지별 선형회귀 기반 다음달 프로젝션
+
+    window_months: 0이면 전체 기간, N이면 최근 N개월만 회귀에 사용.
+    window 내 거래가 min_trades 미만이면 전체 기간 fallback.
+    """
     results = []
     groups = monthly_avg.groupby(["구", "단지명", "면적구간"])
 
@@ -25,6 +29,16 @@ def compute_projection(monthly_avg: pd.DataFrame, min_trades: int = 5) -> pd.Dat
             continue
 
         group = group.sort_values("거래년월")
+
+        # window 필터 (최근 N개월)
+        if window_months > 0:
+            all_months = sorted(group["거래년월"].tolist())
+            cutoff = all_months[-window_months] if len(all_months) > window_months else all_months[0]
+            windowed = group[group["거래년월"] >= cutoff]
+            if windowed["거래건수"].sum() >= min_trades:
+                group = windowed
+            # min_trades 미달이면 전체 기간 그대로 사용
+
         months = group["거래년월"].tolist()
         prices = group["평균거래금액"].tolist()
 
