@@ -86,7 +86,8 @@ def geocode_all(force: bool = False) -> dict:
         kapt = info.get("kapt", "")
 
         # geocoding 쿼리 결정
-        if addr and addr != "-":
+        # 주소에 올바른 구 이름이 포함되어야만 사용 (다른 구 주소가 잘못 매핑된 경우 방지)
+        if addr and addr != "-" and gu in addr:
             geo_query = addr
         else:
             geo_query = f"{name} {gu} 서울"
